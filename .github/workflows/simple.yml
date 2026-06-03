@@ -1,0 +1,23 @@
+name: Simple Workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  linux-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print a greeting
+        run: echo "Hello from Linux"
+
+      - name: Run multiple commands
+        run: |
+          echo "Step 1"
+          echo "Step 2"
+
+  mac-job:
+    needs: linux-job
+    runs-on: macos-latest
+    steps:
+      - name: Print a greeting
+        run: echo "Hello from Mac"
