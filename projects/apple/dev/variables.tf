@@ -45,3 +45,8 @@ variable "availability_zones" {
   type        = list(string)
   default     = ["ap-south-1a", "ap-south-1b"]
 }
+variable "app_image" {
+  description = "Docker image URI for the app (from ECR)"
+  type        = string
+  default     = "963462797840.dkr.ecr.ap-south-1.amazonaws.com/student-portal:1.0"
+}

@@ -51,3 +51,21 @@ output "private_rds_route_table_id" {
   description = "ID of the private route table for RDS subnets (no internet)"
   value       = aws_route_table.private_rds.id
 }
+
+# ------------------------------------------------------------------------------
+# Security Group Outputs
+# ------------------------------------------------------------------------------
+output "alb_sg_id" {
+  description = "ID of the ALB security group"
+  value       = aws_security_group.alb.id
+}
+
+output "ecs_sg_id" {
+  description = "ID of the ECS security group"
+  value       = aws_security_group.ecs.id
+}
+
+output "rds_sg_id" {
+  description = "ID of the RDS security group"
+  value       = aws_security_group.rds.id
+}
