@@ -10,24 +10,30 @@ env:
   ECR_REPOSITORY: student-portal
   ECS_CLUSTER: apple-dev-cluster
   ECS_SERVICE: apple-dev-service
+  AWS_REGION: ap-south-1
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
+      - name: Debug secrets
+        run: |
+          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then echo "✅ AWS_ACCESS_KEY_ID is set"; else echo "❌ AWS_ACCESS_KEY_ID is NOT set"; fi
+          if [ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then echo "✅ AWS_SECRET_ACCESS_KEY is set"; else echo "❌ AWS_SECRET_ACCESS_KEY is NOT set"; fi
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
-      
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Login to ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-      
+
       - name: Build, tag, push
         run: |
           docker build -t ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }} ./src
@@ -43,12 +49,12 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
-      
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Force new ECS deployment
         run: |
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
             --service ${{ env.ECS_SERVICE }} \
             --force-new-deployment \
-            --region ap-south-1
+            --region ${{ env.AWS_REGION }}
