@@ -95,18 +95,18 @@ resource "aws_ecs_task_definition" "this" {
   family                   = "${var.project_name}-${var.environment}-task"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = 256               # 0.25 vCPU (minimum)
-  memory                   = 512               # 0.5 GB (minimum)
+  cpu                      = 256 # 0.25 vCPU (minimum)
+  memory                   = 512 # 0.5 GB (minimum)
   execution_role_arn       = aws_iam_role.ecs_execution.arn
 
   container_definitions = jsonencode([
     {
-      name  = "app"
-      image = var.app_image
+      name      = "app"
+      image     = var.app_image
       essential = true
       environment = [
         {
-          name = "DB_LINK"
+          name  = "DB_LINK"
           value = "postgresql://postgres:${jsondecode(data.aws_secretsmanager_secret_version.db_secret.secret_string)["password"]}@${jsondecode(data.aws_secretsmanager_secret_version.db_secret.secret_string)["host"]}:5432/${jsondecode(data.aws_secretsmanager_secret_version.db_secret.secret_string)["dbname"]}"
         }
       ]
@@ -140,7 +140,7 @@ resource "aws_ecs_service" "this" {
   name            = "${var.project_name}-${var.environment}-service"
   cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.this.arn
-  desired_count   = 2                     # Run only one task to save costs
+  desired_count   = var.autoscaling.min_capacity
   launch_type     = "FARGATE"
 
   network_configuration {
@@ -155,6 +155,10 @@ resource "aws_ecs_service" "this" {
     container_port   = var.app_port
   }
 
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
+
   depends_on = [
     aws_iam_role_policy_attachment.ecs_execution,
     aws_cloudwatch_log_group.this
@@ -165,3 +169,38 @@ resource "aws_ecs_service" "this" {
     Project     = var.project_name
   }
 }
+
+# ------------------------------------------------------------
+# ECS Service Auto Scaling (placed outside the service resource)
+# ------------------------------------------------------------
+
+resource "aws_appautoscaling_target" "ecs" {
+  max_capacity       = var.autoscaling.max_capacity
+  min_capacity       = var.autoscaling.min_capacity
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.this.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "cpu" {
+  name               = "${var.project_name}-${var.environment}-cpu-scaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.ecs.resource_id
+  scalable_dimension = aws_appautoscaling_target.ecs.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.ecs.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value       = var.autoscaling.cpu_target_value
+    scale_in_cooldown  = var.autoscaling.scale_in_cooldown
+    scale_out_cooldown = var.autoscaling.scale_out_cooldown
+  }
+}
+
+# Optional service-linked role (if not already created automatically)
+#resource "aws_iam_service_linked_role" "ecs_autoscaling" {
+#  aws_service_name = "ecs.application-autoscaling.amazonaws.com"
+#  description      = "Role for ECS service auto scaling"
+#}

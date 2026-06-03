@@ -1,7 +1,7 @@
 # Hardcoded domain and subdomain
 locals {
-  domain    = "ceratopurity.com"
-  subdomain = "app"
+  domain      = "ceratopurity.com"
+  subdomain   = "app"
   full_domain = "${local.subdomain}.${local.domain}"
 }
 

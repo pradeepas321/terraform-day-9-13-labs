@@ -11,11 +11,11 @@ module "network" {
 }
 
 module "database" {
-  source         = "./modules/database"
-  db_subnet_ids  = module.network.rds_subnet_ids   # from your network module
-  db_sg_id       = module.network.rds_sg_id        # RDS security group ID
-  project_name   = var.project_name   # from root variables.tf
-  environment    = var.environment    # from root variables.tf
+  source        = "./modules/database"
+  db_subnet_ids = module.network.rds_subnet_ids # from your network module
+  db_sg_id      = module.network.rds_sg_id      # RDS security group ID
+  project_name  = var.project_name              # from root variables.tf
+  environment   = var.environment               # from root variables.tf
 }
 
 module "ecr" {
@@ -26,9 +26,9 @@ module "loadbalancers" {
   source            = "./modules/aws_services/loadbalancers"
   vpc_id            = module.network.vpc_id
   public_subnet_ids = module.network.public_subnet_ids
-  alb_sg_id         = module.network.alb_sg_id  # from your security_groups.tf
+  alb_sg_id         = module.network.alb_sg_id # from your security_groups.tf
   app_port          = 8000
-  certificate_arn   = module.dns.certificate_arn   
+  certificate_arn   = module.dns.certificate_arn
 }
 
 module "dns" {

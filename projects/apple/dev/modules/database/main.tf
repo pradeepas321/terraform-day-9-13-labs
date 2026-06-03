@@ -2,7 +2,7 @@
 resource "random_password" "this" {
   length           = 16
   special          = false
-  override_special = "asdfgjhkqwrtopASHLSGSAGNAX12345667890"   # Recommended in reference
+  override_special = "asdfgjhkqwrtopASHLSGSAGNAX12345667890" # Recommended in reference
 }
 
 # RDS subnet group
@@ -18,21 +18,21 @@ resource "aws_db_subnet_group" "this" {
 
 # RDS instance
 resource "aws_db_instance" "this" {
-  identifier            = "${var.project_name}-${var.environment}-postgres"
-  engine                = "postgres"
-  engine_version        = "15.15"
-  instance_class        = "db.t3.micro"
-  allocated_storage     = 20
-  storage_type          = "gp2"
-  db_name               = "mydb"
-  username              = "postgres"
-  password              = random_password.this.result
-  db_subnet_group_name  = aws_db_subnet_group.this.name
-  vpc_security_group_ids = [var.db_sg_id]
-  publicly_accessible   = false
+  identifier              = "${var.project_name}-${var.environment}-postgres"
+  engine                  = "postgres"
+  engine_version          = "15.15"
+  instance_class          = "db.t3.micro"
+  allocated_storage       = 20
+  storage_type            = "gp2"
+  db_name                 = "mydb"
+  username                = "postgres"
+  password                = random_password.this.result
+  db_subnet_group_name    = aws_db_subnet_group.this.name
+  vpc_security_group_ids  = [var.db_sg_id]
+  publicly_accessible     = false
   backup_retention_period = 0
-  skip_final_snapshot   = true
-  apply_immediately     = true
+  skip_final_snapshot     = true
+  apply_immediately       = true
 
   tags = {
     Name = "${var.project_name}-${var.environment}-postgres"

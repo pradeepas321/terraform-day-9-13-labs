@@ -40,3 +40,20 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+variable "autoscaling" {
+  description = "Auto Scaling settings for the ECS service"
+  type = object({
+    min_capacity       = number
+    max_capacity       = number
+    cpu_target_value   = number
+    scale_in_cooldown  = number
+    scale_out_cooldown = number
+  })
+  default = {
+    min_capacity       = 1
+    max_capacity       = 4
+    cpu_target_value   = 60
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 60
+  }
+}

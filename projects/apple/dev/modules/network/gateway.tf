@@ -28,7 +28,7 @@ resource "aws_eip" "nat" {
 # NAT Gateway – placed in the first public subnet (index 0)
 resource "aws_nat_gateway" "this" {
   allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id   # first public subnet (ap-south-1a)
+  subnet_id     = aws_subnet.public[0].id # first public subnet (ap-south-1a)
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-nat"
