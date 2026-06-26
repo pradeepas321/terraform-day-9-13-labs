@@ -43,6 +43,8 @@ jobs:
           # Option 2: Traditional Access Keys (uncomment if using)
           # aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           # aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: 'Debug AWS Identity'
+        run: aws sts get-caller-identity
 
       - name: 'Terraform Init'
         id: init
