@@ -1,0 +1,31 @@
+name: Test AWS OIDC
+
+on:
+  workflow_dispatch:
+
+# CRITICAL: This gives the runner permission to request the OIDC token
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+
+jobs:
+  test-auth:
+    name: Test AWS Authentication
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com   # Explicitly required for GitHub OIDC
+
+      # THIS IS THE ONLY REAL TEST: If this prints your role ARN, everything works!
+      - name: Verify AWS Identity
+        run: aws sts get-caller-identity
