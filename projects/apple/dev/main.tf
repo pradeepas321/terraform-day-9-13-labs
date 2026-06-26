@@ -28,7 +28,7 @@ module "loadbalancers" {
   public_subnet_ids = module.network.public_subnet_ids
   alb_sg_id         = module.network.alb_sg_id # from your security_groups.tf
   app_port          = 8000
-  certificate_arn   = module.dns.certificate_arn
+  certificate_arn   = "arn:aws:acm:ap-south-1:963462797840:certificate/314ab6ea-495f-4d5b-b405-f7f81a36a007"
 }
 
 module "dns" {

@@ -1,62 +1,112 @@
-name: Build and Deploy
+name: Build and Deploy to AWS with Terraform
 
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'src/**'
+  # Manual trigger from the GitHub UI
+  workflow_dispatch:
+  # Uncomment below to auto-run on push to main branch
+  # push:
+  #   branches:
+  #     - main
 
 env:
-  ECR_REPOSITORY: student-portal
-  ECS_CLUSTER: apple-dev-cluster
-  ECS_SERVICE: apple-dev-service
-  AWS_REGION: ap-south-1
+  TF_VERSION: '1.5.0'          # Terraform version for consistency
+  AWS_REGION: 'ap-south-1'     # Your AWS region
+
+permissions:
+  id-token: write              # Required for OIDC authentication
+  contents: read
 
 jobs:
-  build-and-push:
+  # ======================
+  # 1. PLAN JOB
+  # ======================
+  terraform-plan:
+    name: 'Terraform Plan'
     runs-on: ubuntu-latest
+    outputs:
+      plan-exitcode: ${{ steps.plan.outputs.exitcode }}
     steps:
-      - uses: actions/checkout@v4
+      - name: 'Checkout Code'
+        uses: actions/checkout@v4
 
-      - name: Debug secrets
+      - name: 'Setup Terraform'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: 'Configure AWS Credentials'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # Option 1: OIDC (Recommended - most secure)
+          #role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          #aws-region: ${{ env.AWS_REGION }}
+          # Option 2: Traditional Access Keys (uncomment if using)
+           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: 'Terraform Init'
+        id: init
+        run: terraform init
+        working-directory: ./projects/apple/dev
+
+      - name: 'Terraform Validate'
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ./projects/apple/dev
+
+      - name: 'Terraform Plan'
+        id: plan
         run: |
-          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then echo "✅ Access key ID present"; else echo "❌ Access key ID missing"; fi
-          if [ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then echo "✅ Secret access key present"; else echo "❌ Secret access key missing"; fi
+          terraform plan -no-color -out=tfplan
+          echo "exitcode=$?" >> $GITHUB_OUTPUT
+        working-directory: ./projects/apple/dev
+        continue-on-error: true   # Allows plan to show output even if it fails
 
-      - name: Set AWS credentials as environment variables
-        run: |
-          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
-          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
-          echo "AWS_DEFAULT_REGION=${{ env.AWS_REGION }}" >> $GITHUB_ENV
+      - name: 'Upload Terraform Plan Artifact'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: ./projects/apple/dev/tfplan
+          retention-days: 1
 
-      - name: Test AWS CLI
-        run: aws sts get-caller-identity
-
-      - name: Login to ECR
-        id: login-ecr
-        run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
-
-      - name: Build, tag, push
-        run: |
-          docker build -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }} ./src
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
-          echo "image=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}" >> $GITHUB_OUTPUT
-
-  deploy:
-    needs: build-and-push
+  # ======================
+  # 2. APPLY JOB
+  # ======================
+  terraform-apply:
+    name: 'Terraform Apply'
     runs-on: ubuntu-latest
+    needs: terraform-plan
+    # Only run on main branch AND if plan had changes (exit code 2)
+    if: github.ref == 'refs/heads/main' && needs.terraform-plan.outputs.plan-exitcode == '2'
+    environment: 
+      name: production   # Optional: Connect to GitHub Environments for approvals
     steps:
-      - name: Set AWS credentials as environment variables
-        run: |
-          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
-          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
-          echo "AWS_DEFAULT_REGION=${{ env.AWS_REGION }}" >> $GITHUB_ENV
+      - name: 'Checkout Code'
+        uses: actions/checkout@v4
 
-      - name: Force new ECS deployment
-        run: |
-          aws ecs update-service \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --service ${{ env.ECS_SERVICE }} \
-            --force-new-deployment \
-            --region ${{ env.AWS_REGION }}
+      - name: 'Setup Terraform'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: 'Configure AWS Credentials'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 'Terraform Init'
+        id: init
+        run: terraform init
+        working-directory: ./projects/apple/dev
+
+      - name: 'Download Terraform Plan'
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: ./projects/apple/dev
+
+      - name: 'Terraform Apply'
+        id: apply
+        run: terraform apply -auto-approve tfplan
+        working-directory: ./projects/apple/dev
